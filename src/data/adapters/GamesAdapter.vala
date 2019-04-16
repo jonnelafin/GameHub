@@ -126,10 +126,10 @@ namespace GameHub.Data.Adapters
 					loading_sources.add(src);
 					update_loading_status();
 					src.load_games.begin(add, () => {
-						Idle.add(() => {
+						/*Idle.add(() => {
 							changed();
 							return Source.REMOVE;
-						}, Priority.LOW);
+						}, Priority.LOW);*/
 					}, (obj, res) => {
 						src.load_games.end(res);
 						loading_sources.remove(src);
@@ -158,11 +158,12 @@ namespace GameHub.Data.Adapters
 			if(!is_cached)
 			{
 				new_games_added = true;
-				Idle.add(() => {
-					changed();
-					return Source.REMOVE;
-				}, Priority.LOW);
 			}
+
+			Idle.add(() => {
+				changed();
+				return Source.REMOVE;
+			}, Priority.LOW);
 
 			if(game is Sources.User.UserGame)
 			{

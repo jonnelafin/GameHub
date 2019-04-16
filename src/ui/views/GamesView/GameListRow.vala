@@ -74,6 +74,7 @@ namespace GameHub.UI.Views.GamesView
 
 			favorite_icon = new Image.from_icon_name("gh-game-favorite-symbolic", IconSize.BUTTON);
 			updated_icon = new Image.from_icon_name("gh-game-updated-symbolic", IconSize.BUTTON);
+			favorite_icon.no_show_all = updated_icon.no_show_all = true;
 			favorite_icon.margin_top = updated_icon.margin_top = 2;
 			favorite_icon.valign = updated_icon.valign = Align.CENTER;
 			favorite_icon.pixel_size = updated_icon.pixel_size = 8;
@@ -88,6 +89,7 @@ namespace GameHub.UI.Views.GamesView
 
 			state_label = new Label(null);
 			state_label.halign = Align.START;
+			state_label.no_show_all = true;
 
 			vbox.add(label_hbox);
 			vbox.add(state_label);
