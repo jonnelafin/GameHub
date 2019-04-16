@@ -28,21 +28,38 @@ namespace GameHub.UI.Views.GamesView
 {
 	public class GameListRow: ListBoxRow
 	{
-		public Game game;
+		private Game? _game = null;
+		public Game? game
+		{
+			get
+			{
+				return _game;
+			}
+			construct set
+			{
+				update(value);
+			}
+		}
 
 		public signal void update_tags();
 
 		private AutoSizeImage image;
+		private Label label;
 		private Label state_label;
+		private Image favorite_icon;
+		private Image updated_icon;
 
 		private string old_icon;
 
 		private GameHub.Settings.UI ui_settings;
 
-		public GameListRow(Game game)
+		public GameListRow(Game? game=null)
 		{
-			this.game = game;
+			Object(game: game);
+		}
 
+		construct
+		{
 			var hbox = new Box(Orientation.HORIZONTAL, 8);
 			hbox.margin = 4;
 			var vbox = new Box(Orientation.VERTICAL, 0);
@@ -55,13 +72,13 @@ namespace GameHub.UI.Views.GamesView
 
 			var label_hbox = new Box(Orientation.HORIZONTAL, 4);
 
-			var favorite_icon = new Image.from_icon_name("gh-game-favorite-symbolic", IconSize.BUTTON);
-			var updated_icon = new Image.from_icon_name("gh-game-updated-symbolic", IconSize.BUTTON);
+			favorite_icon = new Image.from_icon_name("gh-game-favorite-symbolic", IconSize.BUTTON);
+			updated_icon = new Image.from_icon_name("gh-game-updated-symbolic", IconSize.BUTTON);
 			favorite_icon.margin_top = updated_icon.margin_top = 2;
 			favorite_icon.valign = updated_icon.valign = Align.CENTER;
 			favorite_icon.pixel_size = updated_icon.pixel_size = 8;
 
-			var label = new Label(game.name);
+			label = new Label(null);
 			label.halign = Align.START;
 			label.get_style_context().add_class("category-label");
 
@@ -77,22 +94,11 @@ namespace GameHub.UI.Views.GamesView
 
 			hbox.add(vbox);
 
-			game.status_change.connect(s => {
-				Idle.add(() => {
-					label.label = game.name;
-					state_label.label = s.description;
-					favorite_icon.visible = game.has_tag(Tables.Tags.BUILTIN_FAVORITES);
-					update_icon();
-					changed();
-					return Source.REMOVE;
-				});
-			});
-			game.status_change(game.status);
-
 			notify["is-selected"].connect(update_icon);
 
 			ui_settings = GameHub.Settings.UI.get_instance();
-			ui_settings.notify["compact-list"].connect(update);
+			ui_settings.notify["compact-list"].connect(update_compact_view);
+			update_compact_view();
 
 			var ebox = new EventBox();
 			ebox.add(hbox);
@@ -117,28 +123,51 @@ namespace GameHub.UI.Views.GamesView
 				}
 				return true;
 			});
-
-			favorite_icon.visible = game.has_tag(Tables.Tags.BUILTIN_FAVORITES);
-			updated_icon.visible = false;
-			if(game is GameHub.Data.Sources.GOG.GOGGame)
-			{
-				game.notify["has-updates"].connect(() => {
-					Idle.add(() => {
-						updated_icon.visible = (game as GameHub.Data.Sources.GOG.GOGGame).has_updates;
-						return Source.REMOVE;
-					});
-				});
-				game.notify_property("has-updates");
-			}
 		}
 
-		public override void show_all()
+		private ulong status_handler_id;
+		private ulong updates_handler_id;
+
+		private void update(Game? new_game)
 		{
-			base.show_all();
-			update();
+			if(new_game == _game || new_game == null) return;
+
+			if(_game != null)
+			{
+				_game.disconnect(status_handler_id);
+				_game.disconnect(updates_handler_id);
+			}
+
+			_game = new_game;
+
+			status_handler_id = game.status_change.connect(status_handler);
+			status_handler(game.status);
+
+			updates_handler_id = game.notify["has-updates"].connect(updates_handler);
+			updates_handler();
 		}
 
-		public void update()
+		private void status_handler(Game.Status s)
+		{
+			Idle.add(() => {
+				label.label = game.name;
+				state_label.label = s.description;
+				favorite_icon.visible = game.has_tag(Tables.Tags.BUILTIN_FAVORITES);
+				update_icon();
+				changed();
+				return Source.REMOVE;
+			}, Priority.LOW);
+		}
+
+		private void updates_handler()
+		{
+			Idle.add(() => {
+				updated_icon.visible = game is GameHub.Data.Sources.GOG.GOGGame && (game as GameHub.Data.Sources.GOG.GOGGame).has_updates;
+				return Source.REMOVE;
+			}, Priority.LOW);
+		}
+
+		public void update_compact_view()
 		{
 			var compact = ui_settings.compact_list;
 			var image_size = compact ? 16 : 36;

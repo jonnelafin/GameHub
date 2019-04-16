@@ -25,6 +25,7 @@ using GameHub.Data;
 using GameHub.Data.Adapters;
 using GameHub.Data.DB;
 using GameHub.Utils;
+using GameHub.UI.Widgets;
 using GameHub.UI.Windows;
 
 namespace GameHub.UI.Views.GamesView
@@ -44,10 +45,10 @@ namespace GameHub.UI.Views.GamesView
 		private Granite.Widgets.AlertView empty_alert;
 
 		private ScrolledWindow games_grid_scrolled;
-		private FlowBox games_grid;
+		private RecyclerContainer games_grid;
 
 		private Paned games_list_paned;
-		private ListBox games_list;
+		private RecyclerContainer games_list;
 		private GameDetailsView.GameDetailsView games_list_details;
 
 		private Granite.Widgets.ModeButton view;
@@ -128,15 +129,18 @@ namespace GameHub.UI.Views.GamesView
 
 			empty_alert = new Granite.Widgets.AlertView(_("No games"), _("Get some games or enable some game sources in settings"), "dialog-warning");
 
-			games_grid = new FlowBox();
+			games_adapter = new GamesAdapter();
+			games_adapter.changed.connect(update_view);
+
+			games_grid = new Widgets.RecyclerContainer(games_adapter, 0, GameCard.CARD_WIDTH_MIN, GameCard.CARD_WIDTH_MAX);
 			games_grid.get_style_context().add_class("games-grid");
 			games_grid.margin = 4;
 
-			games_grid.activate_on_single_click = false;
+			/*games_grid.activate_on_single_click = false;
 			games_grid.homogeneous = true;
 			games_grid.min_children_per_line = 2;
-			games_grid.selection_mode = SelectionMode.BROWSE;
-			games_grid.valign = Align.START;
+			games_grid.selection_mode = SelectionMode.BROWSE;*/
+			games_grid.expand = true;
 
 			games_grid_scrolled = new ScrolledWindow(null, null);
 			games_grid_scrolled.expand = true;
@@ -145,8 +149,8 @@ namespace GameHub.UI.Views.GamesView
 
 			games_list_paned = new Paned(Orientation.HORIZONTAL);
 
-			games_list = new ListBox();
-			games_list.selection_mode = SelectionMode.BROWSE;
+			games_list = new Widgets.RecyclerContainer(games_adapter, 1);
+			//games_list.selection_mode = SelectionMode.BROWSE;
 
 			games_list_details = new GameDetailsView.GameDetailsView(null);
 			games_list_details.content_margin = 16;
@@ -246,13 +250,10 @@ namespace GameHub.UI.Views.GamesView
 			settings.image = new Image.from_icon_name("open-menu" + Settings.UI.symbolic_icon_suffix, Settings.UI.headerbar_icon_size);
 			settings.action_name = Application.ACTION_PREFIX + Application.ACTION_SETTINGS;
 
-			games_list.row_selected.connect(row => {
+			/*games_list.row_selected.connect(row => {
 				var item = row as GameListRow;
 				games_list_details.game = item != null ? item.game : null;
-			});
-
-			games_adapter = new GamesAdapter(games_grid, games_list);
-			games_adapter.cache_loaded.connect(update_view);
+			});*/
 
 			filter.mode_changed.connect(update_view);
 			search.search_changed.connect(() => {
@@ -481,7 +482,7 @@ namespace GameHub.UI.Views.GamesView
 					break;
 
 				case ACTION_SELECT_RANDOM_GAME:
-					int index = Random.int_range(0, (int32) games_grid.get_children().length());
+					/*int index = Random.int_range(0, (int32) games_grid.get_children().length());
 					var card = games_grid.get_child_at_index(index);
 					if(card != null)
 					{
@@ -499,7 +500,7 @@ namespace GameHub.UI.Views.GamesView
 						{
 							row.grab_focus();
 						}
-					}
+					}*/
 					break;
 
 				case ACTION_ADD_GAME:
@@ -639,7 +640,7 @@ namespace GameHub.UI.Views.GamesView
 
 		private void select_first_visible_game()
 		{
-			var row = games_list.get_selected_row() as GameListRow?;
+			/*var row = games_list.get_selected_row() as GameListRow?;
 			if(row != null && games_adapter.filter(row.game)) return;
 			row = games_list.get_row_at_y(32) as GameListRow?;
 			if(row != null) games_list.select_row(row);
@@ -659,12 +660,12 @@ namespace GameHub.UI.Views.GamesView
 				{
 					card.grab_focus();
 				}
-			}
+			}*/
 		}
 
 		private void search_run_first_matching_game()
 		{
-			if(search.text.strip().length == 0 || !search.has_focus) return;
+			/*if(search.text.strip().length == 0 || !search.has_focus) return;
 
 			if(view.selected == 0)
 			{
@@ -683,7 +684,7 @@ namespace GameHub.UI.Views.GamesView
 				{
 					row.game.run_or_install.begin();
 				}
-			}
+			}*/
 		}
 
 		private InfoBar message(string text, MessageType type=MessageType.OTHER)

@@ -120,6 +120,7 @@ sources = [
 	'ui/views/GameDetailsView/blocks/GOGDetails.vala',
 	'ui/views/GameDetailsView/blocks/SteamDetails.vala',
 
+	'ui/widgets/RecyclerContainer.vala',
 	'ui/widgets/AutoSizeImage.vala',
 	'ui/widgets/ActionButton.vala',
 	'ui/widgets/FileChooserEntry.vala',

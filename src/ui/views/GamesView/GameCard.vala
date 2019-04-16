@@ -29,7 +29,18 @@ namespace GameHub.UI.Views.GamesView
 {
 	public class GameCard: FlowBoxChild
 	{
-		public Game game { get; construct; }
+		private Game? _game = null;
+		public Game? game
+		{
+			get
+			{
+				return _game;
+			}
+			construct set
+			{
+				update(value);
+			}
+		}
 
 		public signal void update_tags();
 
@@ -49,14 +60,19 @@ namespace GameHub.UI.Views.GamesView
 
 		private Box actions;
 
-		private const int CARD_WIDTH_MIN = 320;
-		private const int CARD_WIDTH_MAX = 680;
-		private const float CARD_RATIO = 0.467f; // 460x215
+		public const int CARD_WIDTH_MIN = 320;
+		public const int CARD_WIDTH_MAX = 680;
+		public const float CARD_RATIO = 0.467f; // 460x215
 
 		private Frame progress_bar;
 
 		private Image no_image_indicator;
 		private Image running_indicator;
+
+		public GameCard(Game? game=null)
+		{
+			Object(game: game);
+		}
 
 		construct
 		{
@@ -177,7 +193,7 @@ namespace GameHub.UI.Views.GamesView
 						open_context_menu(e, true);
 						break;
 				}
-				((FlowBox) parent).select_child(this);
+				//((FlowBox) parent).select_child(this);
 				grab_focus();
 				return true;
 			});
@@ -196,141 +212,157 @@ namespace GameHub.UI.Views.GamesView
 				}
 				return false;
 			});
+
+			Settings.UI.get_instance().notify["show-grid-icons"].connect(update_grid_icons);
+			update_grid_icons();
 		}
 
-		public GameCard(Game game)
+		private ulong status_handler_id;
+		private ulong image_handler_id;
+		private ulong updates_handler_id;
+
+		private void update(Game? new_game)
 		{
-			Object(game: game);
+			if(new_game == _game || new_game == null) return;
+
+			if(_game != null)
+			{
+				_game.disconnect(status_handler_id);
+				_game.disconnect(image_handler_id);
+				_game.disconnect(updates_handler_id);
+			}
+
+			_game = new_game;
 
 			Idle.add(() => {
 				label.label = game.name;
 				src_icon.icon_name = game.source.icon;
+
+				src_icons.foreach(w => src_icons.remove(w));
+				src_icons.add(src_icon);
+
+				var merges = Tables.Merges.get(game);
+				if(merges != null && merges.size > 0)
+				{
+					foreach(var g in merges)
+					{
+						var icon_name = g.source.icon;
+
+						src_icons.foreach(w => { if((w as Image).icon_name == icon_name) src_icons.remove(w); });
+
+						var icon = new Image();
+						icon.icon_name = icon_name;
+						icon.icon_size = IconSize.LARGE_TOOLBAR;
+						src_icons.add(icon);
+					}
+				}
+				src_icons.show_all();
+
+				platform_icons.foreach(w => platform_icons.remove(w));
+				foreach(var p in game.platforms)
+				{
+					var icon = new Image();
+					icon.icon_name = p.icon();
+					icon.icon_size = IconSize.LARGE_TOOLBAR;
+					platform_icons.add(icon);
+				}
+				platform_icons.show_all();
+
 				return Source.REMOVE;
-			});
+			}, Priority.LOW);
 
-			update();
+			status_handler_id = game.status_change.connect(status_handler);
+			status_handler(game.status);
 
-			card.get_style_context().add_class("installed");
+			image_handler_id = game.notify["image"].connect(image_handler);
+			image_handler();
 
-			game.status_change.connect(s => {
-				Idle.add(() => {
-					label.label = game.name;
-					status_label.label = s.description;
-					favorite_icon.visible = game.has_tag(Tables.Tags.BUILTIN_FAVORITES);
-					switch(s.state)
-					{
-						case Game.State.UNINSTALLED:
-							card.get_style_context().remove_class("installed");
-							card.get_style_context().remove_class("downloading");
-							card.get_style_context().remove_class("installing");
-							break;
+			updates_handler_id = game.notify["has-updates"].connect(updates_handler);
+			updates_handler();
+		}
 
-						case Game.State.INSTALLED:
-							card.get_style_context().add_class("installed");
-							card.get_style_context().remove_class("downloading");
-							card.get_style_context().remove_class("installing");
-							break;
+		private void status_handler(Game.Status s)
+		{
+			Idle.add(() => {
+				label.label = game.name;
+				status_label.label = s.description;
+				favorite_icon.visible = game.has_tag(Tables.Tags.BUILTIN_FAVORITES);
+				switch(s.state)
+				{
+					case Game.State.UNINSTALLED:
+						card.get_style_context().remove_class("installed");
+						card.get_style_context().remove_class("downloading");
+						card.get_style_context().remove_class("installing");
+						break;
 
-						case Game.State.DOWNLOADING:
-							card.get_style_context().remove_class("installed");
-							card.get_style_context().add_class("downloading");
-							card.get_style_context().remove_class("installing");
-							Allocation alloc;
-							card.get_allocation(out alloc);
-							if(s.download != null)
-							{
-								progress_bar.set_size_request((int) (s.download.status.progress * alloc.width), 8);
-							}
-							break;
+					case Game.State.INSTALLED:
+						card.get_style_context().add_class("installed");
+						card.get_style_context().remove_class("downloading");
+						card.get_style_context().remove_class("installing");
+						break;
 
-						case Game.State.INSTALLING:
-							card.get_style_context().remove_class("installed");
-							card.get_style_context().remove_class("downloading");
-							card.get_style_context().add_class("installing");
-							break;
-					}
-					if(game.is_running)
-					{
-						card.get_style_context().add_class("running");
-						running_indicator.opacity = 1;
-						no_image_indicator.opacity = 0;
-					}
-					else
-					{
-						card.get_style_context().remove_class("running");
-						running_indicator.opacity = 0;
-						no_image_indicator.opacity = game.image == null ? 1 : 0;
-					}
-					return Source.REMOVE;
-				});
-			});
-			game.status_change(game.status);
+					case Game.State.DOWNLOADING:
+						card.get_style_context().remove_class("installed");
+						card.get_style_context().add_class("downloading");
+						card.get_style_context().remove_class("installing");
+						Allocation alloc;
+						card.get_allocation(out alloc);
+						if(s.download != null)
+						{
+							progress_bar.set_size_request((int) (s.download.status.progress * alloc.width), 8);
+						}
+						break;
 
-			game.notify["image"].connect(() => {
+					case Game.State.INSTALLING:
+						card.get_style_context().remove_class("installed");
+						card.get_style_context().remove_class("downloading");
+						card.get_style_context().add_class("installing");
+						break;
+				}
+				if(game.is_running)
+				{
+					card.get_style_context().add_class("running");
+					running_indicator.opacity = 1;
+					no_image_indicator.opacity = 0;
+				}
+				else
+				{
+					card.get_style_context().remove_class("running");
+					running_indicator.opacity = 0;
+					no_image_indicator.opacity = game.image == null ? 1 : 0;
+				}
+				return Source.REMOVE;
+			}, Priority.LOW);
+		}
+
+		private void image_handler()
+		{
+			Idle.add(() => {
 				Utils.load_image.begin(image, game.image, "image");
 				no_image_indicator.opacity = game.image == null && !game.is_running ? 1 : 0;
-			});
-			game.notify_property("image");
+				return Source.REMOVE;
+			}, Priority.LOW);
+		}
 
-			updated_icon.visible = false;
-			if(game is GameHub.Data.Sources.GOG.GOGGame)
-			{
-				game.notify["has-updates"].connect(() => {
-					Idle.add(() => {
-						updated_icon.visible = (game as GameHub.Data.Sources.GOG.GOGGame).has_updates;
-						return Source.REMOVE;
-					});
-				});
-				game.notify_property("has-updates");
-			}
+		private void updates_handler()
+		{
+			Idle.add(() => {
+				updated_icon.visible = game is GameHub.Data.Sources.GOG.GOGGame && (game as GameHub.Data.Sources.GOG.GOGGame).has_updates;
+				return Source.REMOVE;
+			}, Priority.LOW);
+		}
 
-			Settings.UI.get_instance().notify["show-grid-icons"].connect(update);
+		private void update_grid_icons()
+		{
+			Idle.add(() => {
+				src_icons.visible = platform_icons.visible = Settings.UI.get_instance().show_grid_icons;
+				return Source.REMOVE;
+			}, Priority.LOW);
 		}
 
 		private void open_context_menu(Event e, bool at_pointer=true)
 		{
 			new GameContextMenu(game, this).open(e, at_pointer);
-		}
-
-		public void update()
-		{
-			src_icons.foreach(w => src_icons.remove(w));
-			src_icons.add(src_icon);
-
-			var merges = Tables.Merges.get(game);
-			if(merges != null && merges.size > 0)
-			{
-				foreach(var g in merges)
-				{
-					var icon_name = g.source.icon;
-
-					src_icons.foreach(w => { if((w as Image).icon_name == icon_name) src_icons.remove(w); });
-
-					var icon = new Image();
-					icon.icon_name = icon_name;
-					icon.icon_size = IconSize.LARGE_TOOLBAR;
-					src_icons.add(icon);
-				}
-			}
-			src_icons.show_all();
-
-			platform_icons.foreach(w => platform_icons.remove(w));
-			foreach(var p in game.platforms)
-			{
-				var icon = new Image();
-				icon.icon_name = p.icon();
-				icon.icon_size = IconSize.LARGE_TOOLBAR;
-				platform_icons.add(icon);
-			}
-			platform_icons.show_all();
-
-			src_icons.visible = platform_icons.visible = Settings.UI.get_instance().show_grid_icons;
-		}
-
-		public override void show_all()
-		{
-			base.show_all();
-			update();
 		}
 	}
 }
