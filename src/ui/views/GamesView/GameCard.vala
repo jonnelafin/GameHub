@@ -338,7 +338,7 @@ namespace GameHub.UI.Views.GamesView
 		private void image_handler()
 		{
 			Idle.add(() => {
-				Utils.load_image.begin(image, game.image, "image");
+				image.load(game.image, "image");
 				no_image_indicator.opacity = game.image == null && !game.is_running ? 1 : 0;
 				return Source.REMOVE;
 			}, Priority.LOW);
